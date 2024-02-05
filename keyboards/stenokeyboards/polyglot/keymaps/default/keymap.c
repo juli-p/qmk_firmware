@@ -16,7 +16,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include QMK_KEYBOARD_H
-#include "keymap_steno.h"
 
 enum polyglot_layers {
     _STENO_DEFAULT,
