@@ -16,96 +16,143 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include QMK_KEYBOARD_H
-#include "keymap_steno.h"
+// #include "keymap_steno.h"
 
 // layer declarations 
 enum polyglot_layers {
-    _CONTROL_LAYER,
     _QWERTZ_DE,
     _QWERTZ_NO,
     _NUM_LAYER,
     _SYM_LAYER,
     _STENO,
+    _CONTROL_LAYER,
 };
 
 #define NUM_LAYER MO(_NUM_LAYER)
 #define SYM_LAYER MO(_SYM_LAYER)
 #define QWERTZ_DE DF(_QWERTZ_DE)
 #define QWERTZ_NO DF(_QWERTZ_NO)
-#define CONTROL_LAYER DF(_CONTROL_LAYER)
+#define CONTROL_LAYER TG(_CONTROL_LAYER)
 #define STENO DF(_STENO)
 
 // tap dance declarations
 enum {
-    CTL_MV_SHFT,
+    TD_MV_CTRL,
+    TD_ESC_ALT
 };
 
-// Tap Dance definitions
+typedef struct {
+    uint16_t tap;
+    uint16_t hold;
+    uint16_t held;
+} tap_dance_tap_hold_t;
+
+void tap_dance_tap_hold_finished(tap_dance_state_t *state, void *user_data);
+void tap_dance_tap_hold_reset(tap_dance_state_t *state, void *user_data);
+
+#define ACTION_TAP_DANCE_TAP_HOLD(tap, hold) \
+    { .fn = {NULL, tap_dance_tap_hold_finished, tap_dance_tap_hold_reset}, .user_data = (void *)&((tap_dance_tap_hold_t){tap, hold, 0}), }
+
 tap_dance_action_t tap_dance_actions[] = {
-    [CTL_MV_SHFT] = ACTION_TAP_DANCE_LAYER_MOVE(KC_LEFT_SHIFT, _CONTROL_LAYER),
+    // [CTL_MV_SHFT] = ACTION_TAP_DANCE_LAYER_MOVE(KC_LEFT_SHIFT, _CONTROL_LAYER),
+    // [CTL_MV_SHFT] = ACTION_TAP_DANCE_TAP_HOLD(KC_LEFT_SHIFT, CONTROL_LAYER),
+    [TD_MV_CTRL] = ACTION_TAP_DANCE_LAYER_TOGGLE(KC_LCTL, _CONTROL_LAYER),
+    [TD_ESC_ALT] = ACTION_TAP_DANCE_TAP_HOLD(KC_ESC, KC_LALT)
 };
+
+
+bool process_record_user(uint16_t keycode, keyrecord_t *record) {
+    tap_dance_action_t *action;
+
+    switch (keycode) {
+        case TD(TD_ESC_ALT):  // list all tap dance keycodes with tap-hold configurations
+            action = &tap_dance_actions[QK_TAP_DANCE_GET_INDEX(keycode)];
+            if (!record->event.pressed && action->state.count && !action->state.finished) {
+                tap_dance_tap_hold_t *tap_hold = (tap_dance_tap_hold_t *)action->user_data;
+                tap_code16(tap_hold->tap);
+            }
+    }
+    return true;
+}
+
+void tap_dance_tap_hold_finished(tap_dance_state_t *state, void *user_data) {
+    tap_dance_tap_hold_t *tap_hold = (tap_dance_tap_hold_t *)user_data;
+
+    if (state->pressed) {
+        if (state->count == 1
+#ifndef PERMISSIVE_HOLD
+            && !state->interrupted
+#endif
+        ) {
+            register_code16(tap_hold->hold);
+            tap_hold->held = tap_hold->hold;
+        } else {
+            register_code16(tap_hold->tap);
+            tap_hold->held = tap_hold->tap;
+        }
+    }
+}
+
+void tap_dance_tap_hold_reset(tap_dance_state_t *state, void *user_data) {
+    tap_dance_tap_hold_t *tap_hold = (tap_dance_tap_hold_t *)user_data;
+
+    if (tap_hold->held) {
+        unregister_code16(tap_hold->held);
+        tap_hold->held = 0;
+    }
+}
+
 
 // unicode declarations
 enum unicode_names {
-    NO_O_L,
-    NO_O_U,
-    NO_ae,
-    NO_AE,
-    NO_a,
-    NO_A
+    NO_O_LOWER,
+    NO_O_UPPER,
+    NO_AE_LOWER,
+    NO_AE_UPPER,
+    NO_A_LOWER,
+    NO_A_UPPER
 };
 
 const uint32_t PROGMEM unicode_map[] = {
-    [NO_O_L]  = 0x00f8,
-    [NO_O_U]  = 0x00d8,
-    [NO_ae]  = 0x00c6,
-    [NO_AE]  = 0x00e6,
-    [NO_a]  = 0x00c5,
-    [NO_A]  = 0x00e5,
+    [NO_O_LOWER]   = 0x00f8,
+    [NO_O_UPPER]   = 0x00d8,
+    [NO_AE_LOWER]  = 0x00e6,
+    [NO_AE_UPPER]  = 0x00c6,
+    [NO_A_LOWER]   = 0x00e5,
+    [NO_A_UPPER]   = 0x00c5,
 
 };
 
-#define NO_O UP(NO_O_L,NO_O_U)
+#define NO_O UP(NO_O_LOWER,NO_O_UPPER)
+#define NO_AE UP(NO_AE_LOWER,NO_AE_UPPER)
+#define NO_A UP(NO_A_LOWER,NO_A_UPPER)
 
 // keymap definitions
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
 
-  [_CONTROL_LAYER] = LAYOUT_split_3x6_3(
-  //,-----------------------------------------------------.                    ,-----------------------------------------------------.
-     XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,QWERTZ_NO, QWERTZ_DE,                     XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,
-  //|--------+--------+--------+--------+--------+--------|                    |--------+--------+--------+--------+--------+--------|
-     XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,    STENO,                        XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,
-  //|--------+--------+--------+--------+--------+--------|                    |--------+--------+--------+--------+--------+--------|
-     XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,                          XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,
-  //|--------+--------+--------+--------+--------+--------+--------|  |--------+--------+--------+--------+--------+--------+--------|
-                                 XXXXXXX,UC_PREV,UC_NEXT,                       XXXXXXX,XXXXXXX,XXXXXXX
-                                      //`--------------------------'  `--------------------------'
-
-  ),
-
   [_QWERTZ_DE] = LAYOUT_split_3x6_3(
   //,-----------------------------------------------------.                    ,-----------------------------------------------------.
-       KC_ESC,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,                         KC_Y,    KC_U,    KC_I,    KC_O,   KC_P,  KC_BSPC,
+       TD(TD_ESC_ALT),    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,                         KC_Y,    KC_U,    KC_I,    KC_O,   KC_P,  KC_BSPC,
   //|--------+--------+--------+--------+--------+--------|                    |--------+--------+--------+--------+--------+--------|
-      KC_TAB,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,                         KC_H,    KC_J,    KC_K,    KC_L, KC_L, KC_DEL,
+      KC_TAB,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,                         KC_H,    KC_J,    KC_K,    KC_L, KC_LBRC, KC_DEL,
   //|--------+--------+--------+--------+--------+--------|                    |--------+--------+--------+--------+--------+--------|
-      KC_COMM, KC_DOT,   KC_Z,    KC_X,    KC_C,    KC_V,                           KC_B,  KC_N,  KC_M, NO_O,  KC_L,   KC_ENT,
+      KC_COMM, KC_DOT,   KC_Z,    KC_X,    KC_C,    KC_V,                           KC_B,  KC_N,  KC_M, KC_SCLN,  KC_QUOT,   KC_ENT,
   //|--------+--------+--------+--------+--------+--------+--------|  |--------+--------+--------+--------+--------+--------+--------|
-                                 KC_LCTL,NUM_LAYER,CTL_MV_SHFT,       KC_SPC,SYM_LAYER,KC_LGUI
+                                 TD(TD_MV_CTRL),NUM_LAYER,KC_LEFT_SHIFT,       KC_SPC,SYM_LAYER,KC_LGUI
                                       //`--------------------------'  `--------------------------'
 
   ),
 
   [_QWERTZ_NO] = LAYOUT_split_3x6_3(
   //,-----------------------------------------------------.                    ,-----------------------------------------------------.
-       KC_ESC,    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,                         KC_Y,    KC_U,    KC_I,    KC_O,   KC_P,  KC_BSPC,
+     TD(TD_ESC_ALT),    KC_Q,    KC_W,    KC_E,    KC_R,    KC_T,                         KC_Y,    KC_U,    KC_I,    KC_O,   KC_P,  KC_BSPC,
   //|--------+--------+--------+--------+--------+--------|                    |--------+--------+--------+--------+--------+--------|
-      KC_TAB,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,                         KC_H,    KC_J,    KC_K,    KC_L, KC_LBRC, KC_DEL,
+      KC_TAB,    KC_A,    KC_S,    KC_D,    KC_F,    KC_G,                         KC_H,    KC_J,    KC_K,    KC_L, NO_A, KC_DEL,
   //|--------+--------+--------+--------+--------+--------|                    |--------+--------+--------+--------+--------+--------|
-      KC_COMM, KC_DOT,   KC_Z,    KC_X,    KC_C,    KC_V,                           KC_B,  KC_N,  KC_M, KC_SCLN,  KC_QUOT,   KC_ENT,
+      KC_COMM, KC_DOT,   KC_Z,    KC_X,    KC_C,    KC_V,                           KC_B,  KC_N,  KC_M, NO_O,  NO_AE,   KC_ENT,
   //|--------+--------+--------+--------+--------+--------+--------|  |--------+--------+--------+--------+--------+--------+--------|
-                                 KC_LCTL,NUM_LAYER,CTL_MV_SHFT,       KC_SPC,SYM_LAYER,KC_LGUI
+                                 TD(TD_MV_CTRL),NUM_LAYER,KC_LEFT_SHIFT,       KC_SPC,SYM_LAYER,KC_LGUI
                                       //`--------------------------'  `--------------------------'
 
   ),
@@ -147,6 +194,19 @@ const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
                                        //`--------------------------'  `--------------------------'
 
    ),
+
+  [_CONTROL_LAYER] = LAYOUT_split_3x6_3(
+  //,-----------------------------------------------------.                    ,-----------------------------------------------------.
+     TG(_CONTROL_LAYER),XXXXXXX,XXXXXXX,XXXXXXX,QWERTZ_NO, QWERTZ_DE,                     XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,
+  //|--------+--------+--------+--------+--------+--------|                    |--------+--------+--------+--------+--------+--------|
+     XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,    STENO,                        XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,
+  //|--------+--------+--------+--------+--------+--------|                    |--------+--------+--------+--------+--------+--------|
+     XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,                          XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,XXXXXXX,
+  //|--------+--------+--------+--------+--------+--------+--------|  |--------+--------+--------+--------+--------+--------+--------|
+                                 XXXXXXX,UC_PREV,UC_NEXT,                       XXXXXXX,XXXXXXX,XXXXXXX
+                                      //`--------------------------'  `--------------------------'
+
+  ),
 
 };
 
